@@ -124,11 +124,10 @@ impl Lockfile {
                 TelesyncError::State(format!("failed to read lockfile {}: {}", path.display(), e))
             })?;
 
-            if let Ok(pid) = content.trim().parse::<u32>() {
-                if is_pid_alive(pid) {
+            if let Ok(pid) = content.trim().parse::<u32>()
+                && is_pid_alive(pid) {
                     return Err(TelesyncError::Locked { pid });
                 }
-            }
 
             // Stale lockfile -- PID is not running, remove it
             fs::remove_file(path).map_err(|e| {

@@ -113,7 +113,7 @@ async fn run_sync_command(
     force_file: Option<&str>,
     confirm: bool,
 ) -> Result<ExitCode, TelesyncError> {
-    let root_dir = std::env::current_dir().map_err(|e| TelesyncError::Io(e))?;
+    let root_dir = std::env::current_dir().map_err(TelesyncError::Io)?;
 
     let lock_path = root_dir.join(".telesync.lock");
     let config_path = root_dir.join("telesync.toml");
@@ -146,7 +146,7 @@ async fn run_sync_command(
 }
 
 async fn run_accounts_create() -> Result<ExitCode, TelesyncError> {
-    let root_dir = std::env::current_dir().map_err(|e| TelesyncError::Io(e))?;
+    let root_dir = std::env::current_dir().map_err(TelesyncError::Io)?;
 
     let config_path = root_dir.join("telesync.toml");
     let config = Config::load(&config_path)?;

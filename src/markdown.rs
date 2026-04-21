@@ -105,11 +105,10 @@ fn strip_quotes(s: &str) -> &str {
 
 /// Resolve the page title with priority: frontmatter > first heading > filename-derived.
 pub fn resolve_title(frontmatter: &Frontmatter, body: &str, filename: &str) -> String {
-    if let Some(ref title) = frontmatter.title {
-        if !title.is_empty() {
+    if let Some(ref title) = frontmatter.title
+        && !title.is_empty() {
             return title.clone();
         }
-    }
 
     // Try to extract first heading from body
     if let Some(heading) = extract_first_heading(body) {
@@ -548,8 +547,8 @@ fn check_private_ip(line: &str) -> Option<String> {
 
     while i < len {
         // Look for digit sequences that could be IPs
-        if bytes[i].is_ascii_digit() {
-            if let Some(ip_end) = try_parse_ip_at(line, i) {
+        if bytes[i].is_ascii_digit()
+            && let Some(ip_end) = try_parse_ip_at(line, i) {
                 let candidate = &line[i..ip_end];
                 if is_private_ip(candidate) {
                     return Some(format!("private IP address '{candidate}'"));
@@ -557,7 +556,6 @@ fn check_private_ip(line: &str) -> Option<String> {
                 i = ip_end;
                 continue;
             }
-        }
         i += 1;
     }
     None
