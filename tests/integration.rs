@@ -22,9 +22,9 @@ fn write_test_config(dir: &Path, token: &str, publications: &[(&str, &str)]) {
 
     // Account section
     toml_content.push_str("[accounts.test]\n");
-    toml_content.push_str(&"short_name = \"inttest\"\n".to_string());
-    toml_content.push_str(&"author_name = \"Integration Test\"\n".to_string());
-    toml_content.push_str(&"author_url = \"https://example.com\"\n".to_string());
+    toml_content.push_str("short_name = \"inttest\"\n");
+    toml_content.push_str("author_name = \"Integration Test\"\n");
+    toml_content.push_str("author_url = \"https://example.com\"\n");
     toml_content.push_str(&format!("access_token = \"{}\"\n\n", token));
 
     // Publication sections
