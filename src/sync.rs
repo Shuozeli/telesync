@@ -501,8 +501,7 @@ async fn execute_create(
         }
     }
 
-    Err(last_error
-        .unwrap_or_else(|| TelesyncError::Api("create failed with no error".to_string())))
+    Err(last_error.unwrap_or_else(|| TelesyncError::Api("create failed with no error".to_string())))
 }
 
 async fn execute_update(
@@ -534,7 +533,14 @@ async fn execute_update(
         }
 
         match client
-            .edit_page(path, title, Some(author_name), Some(author_url), nodes, false)
+            .edit_page(
+                path,
+                title,
+                Some(author_name),
+                Some(author_url),
+                nodes,
+                false,
+            )
             .await
         {
             Ok(page) => {
@@ -569,8 +575,7 @@ async fn execute_update(
         }
     }
 
-    Err(last_error
-        .unwrap_or_else(|| TelesyncError::Api("update failed with no error".to_string())))
+    Err(last_error.unwrap_or_else(|| TelesyncError::Api("update failed with no error".to_string())))
 }
 
 async fn execute_delete(
@@ -639,8 +644,7 @@ async fn execute_delete(
         }
     }
 
-    Err(last_error
-        .unwrap_or_else(|| TelesyncError::Api("delete failed with no error".to_string())))
+    Err(last_error.unwrap_or_else(|| TelesyncError::Api("delete failed with no error".to_string())))
 }
 
 fn build_tombstone_nodes(date: &str) -> Vec<Node> {
@@ -677,10 +681,7 @@ async fn detect_duplicate_page(
     title: &str,
 ) -> Option<crate::types::Page> {
     match client.get_page_list(Some(0), Some(200)).await {
-        Ok(page_list) => page_list
-            .pages
-            .into_iter()
-            .find(|page| page.title == title),
+        Ok(page_list) => page_list.pages.into_iter().find(|page| page.title == title),
         Err(e) => {
             warn!(error = %e, "failed to fetch page list for duplicate detection");
             None

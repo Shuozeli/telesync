@@ -87,9 +87,8 @@ impl SyncState {
     }
 
     pub fn save(&self, path: &Path) -> Result<(), TelesyncError> {
-        let json = serde_json::to_string_pretty(self).map_err(|e| {
-            TelesyncError::State(format!("failed to serialize state: {}", e))
-        })?;
+        let json = serde_json::to_string_pretty(self)
+            .map_err(|e| TelesyncError::State(format!("failed to serialize state: {}", e)))?;
 
         let tmp_path = path.with_extension("json.tmp");
 
@@ -122,11 +121,7 @@ impl Lockfile {
     pub fn acquire(path: &Path) -> Result<Lockfile, TelesyncError> {
         if path.exists() {
             let content = fs::read_to_string(path).map_err(|e| {
-                TelesyncError::State(format!(
-                    "failed to read lockfile {}: {}",
-                    path.display(),
-                    e
-                ))
+                TelesyncError::State(format!("failed to read lockfile {}: {}", path.display(), e))
             })?;
 
             if let Ok(pid) = content.trim().parse::<u32>() {

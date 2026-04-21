@@ -135,8 +135,7 @@ impl TelegraphClient {
 
     /// Get a Telegraph page by path. Does not require authentication.
     pub async fn get_page(&self, path: &str, return_content: bool) -> Result<Page, TelesyncError> {
-        let params: Vec<(&str, String)> =
-            vec![("return_content", return_content.to_string())];
+        let params: Vec<(&str, String)> = vec![("return_content", return_content.to_string())];
 
         self.post(&format!("getPage/{path}"), &params).await
     }

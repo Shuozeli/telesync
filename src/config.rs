@@ -29,11 +29,19 @@ pub struct AccountConfig {
 impl Config {
     pub fn load(path: &Path) -> Result<Config, TelesyncError> {
         let content = std::fs::read_to_string(path).map_err(|e| {
-            TelesyncError::Config(format!("failed to read config file {}: {}", path.display(), e))
+            TelesyncError::Config(format!(
+                "failed to read config file {}: {}",
+                path.display(),
+                e
+            ))
         })?;
 
         let config: Config = toml::from_str(&content).map_err(|e| {
-            TelesyncError::Config(format!("failed to parse config file {}: {}", path.display(), e))
+            TelesyncError::Config(format!(
+                "failed to parse config file {}: {}",
+                path.display(),
+                e
+            ))
         })?;
 
         config.validate()?;

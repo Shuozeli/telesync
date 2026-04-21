@@ -244,8 +244,9 @@ pub fn markdown_to_nodes(body: &str) -> Result<Vec<Node>, Vec<ValidationIssue>> 
 
             // Skip events from unsupported elements (table internals)
             Event::Start(Tag::TableHead | Tag::TableRow | Tag::TableCell) => {}
-            Event::End(TagEnd::Table | TagEnd::TableHead | TagEnd::TableRow | TagEnd::TableCell) => {
-            }
+            Event::End(
+                TagEnd::Table | TagEnd::TableHead | TagEnd::TableRow | TagEnd::TableCell,
+            ) => {}
             Event::End(TagEnd::Image) => {}
 
             // Supported elements
@@ -573,9 +574,7 @@ fn try_parse_ip_at(line: &str, start: usize) -> Option<usize> {
             break;
         }
         // Each octet must be 1-3 digits
-        let digits: &str = segment
-            .get(..segment.len().min(3))
-            .unwrap_or(segment);
+        let digits: &str = segment.get(..segment.len().min(3)).unwrap_or(segment);
         let digit_count = digits.chars().take_while(|c| c.is_ascii_digit()).count();
         if digit_count == 0 {
             break;
@@ -595,11 +594,7 @@ fn try_parse_ip_at(line: &str, start: usize) -> Option<usize> {
         }
     }
 
-    if octets == 4 {
-        Some(start + pos)
-    } else {
-        None
-    }
+    if octets == 4 { Some(start + pos) } else { None }
 }
 
 fn is_private_ip(ip: &str) -> bool {

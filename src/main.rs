@@ -82,15 +82,7 @@ async fn main() -> ExitCode {
             dry_run,
             force,
             confirm,
-        }) => {
-            run_sync_command(
-                publication.as_deref(),
-                dry_run,
-                force.as_deref(),
-                confirm,
-            )
-            .await
-        }
+        }) => run_sync_command(publication.as_deref(), dry_run, force.as_deref(), confirm).await,
         Some(Commands::Accounts { command }) => match command {
             AccountCommands::Create => run_accounts_create().await,
         },
@@ -121,9 +113,7 @@ async fn run_sync_command(
     force_file: Option<&str>,
     confirm: bool,
 ) -> Result<ExitCode, TelesyncError> {
-    let root_dir = std::env::current_dir().map_err(|e| {
-        TelesyncError::Io(e)
-    })?;
+    let root_dir = std::env::current_dir().map_err(|e| TelesyncError::Io(e))?;
 
     let lock_path = root_dir.join(".telesync.lock");
     let config_path = root_dir.join("telesync.toml");
@@ -156,9 +146,7 @@ async fn run_sync_command(
 }
 
 async fn run_accounts_create() -> Result<ExitCode, TelesyncError> {
-    let root_dir = std::env::current_dir().map_err(|e| {
-        TelesyncError::Io(e)
-    })?;
+    let root_dir = std::env::current_dir().map_err(|e| TelesyncError::Io(e))?;
 
     let config_path = root_dir.join("telesync.toml");
     let config = Config::load(&config_path)?;
