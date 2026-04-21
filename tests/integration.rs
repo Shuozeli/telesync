@@ -8,8 +8,7 @@ use telesync::state::{PageStatus, SyncState};
 use telesync::sync::run_sync;
 use telesync::types::{Node, NodeAttrs, NodeElement};
 
-const TEST_TOKEN: &str =
-    "b3a57cb6d7732ae7bedc0ae33cf60fd303bee3bfdd7b77446e76bbc604b4";
+const TEST_TOKEN: &str = "b3a57cb6d7732ae7bedc0ae33cf60fd303bee3bfdd7b77446e76bbc604b4";
 
 /// Rate limit delay between API calls (ms).
 const RATE_LIMIT_MS: u64 = 1000;
@@ -36,8 +35,7 @@ fn write_test_config(dir: &Path, token: &str, publications: &[(&str, &str)]) {
         toml_content.push_str("account = \"test\"\n\n");
     }
 
-    std::fs::write(dir.join("telesync.toml"), toml_content)
-        .expect("failed to write test config");
+    std::fs::write(dir.join("telesync.toml"), toml_content).expect("failed to write test config");
 }
 
 fn write_md(dir: &Path, rel_path: &str, content: &str) {
@@ -56,7 +54,6 @@ async fn rate_limit() {
     tokio::time::sleep(std::time::Duration::from_millis(RATE_LIMIT_MS)).await;
 }
 
-
 // ===========================================================================
 // 1. Telegraph Client Tests (API)
 // ===========================================================================
@@ -68,7 +65,11 @@ async fn test_create_account() {
     let short_name = format!("t{}", &uuid::Uuid::new_v4().to_string()[..8]);
 
     let account = client
-        .create_account(&short_name, Some("Test Author"), Some("https://example.com"))
+        .create_account(
+            &short_name,
+            Some("Test Author"),
+            Some("https://example.com"),
+        )
         .await
         .expect("create_account should succeed");
 
@@ -149,10 +150,7 @@ async fn test_create_page() {
         .expect("create_page should succeed");
 
     assert_eq!(page.title, title, "page title should match");
-    assert!(
-        !page.path.is_empty(),
-        "page path should be non-empty"
-    );
+    assert!(!page.path.is_empty(), "page path should be non-empty");
     assert!(
         page.url.starts_with("https://telegra.ph/"),
         "page URL should be a telegra.ph URL, got: {}",
@@ -468,26 +466,15 @@ async fn test_get_views() {
 async fn test_invalid_token() {
     let client = TelegraphClient::new("invalid_token_that_does_not_exist".to_string());
 
-    let result = client
-        .get_account_info(&["short_name"])
-        .await;
+    let result = client.get_account_info(&["short_name"]).await;
 
-    assert!(
-        result.is_err(),
-        "invalid token should produce an error"
-    );
+    assert!(result.is_err(), "invalid token should produce an error");
 
     match result.unwrap_err() {
         TelesyncError::Api(msg) => {
-            assert!(
-                !msg.is_empty(),
-                "API error message should be non-empty"
-            );
+            assert!(!msg.is_empty(), "API error message should be non-empty");
         }
-        other => panic!(
-            "expected TelesyncError::Api, got: {:?}",
-            other
-        ),
+        other => panic!("expected TelesyncError::Api, got: {:?}", other),
     }
 
     rate_limit().await;
@@ -507,7 +494,10 @@ async fn test_sync_create() {
     write_md(
         root,
         "posts/hello.md",
-        &format!("---\ntitle: {}\n---\nHello world from sync test.\n", unique_title()),
+        &format!(
+            "---\ntitle: {}\n---\nHello world from sync test.\n",
+            unique_title()
+        ),
     );
 
     let config = Config::load(&root.join("telesync.toml")).expect("config load failed");
@@ -532,7 +522,11 @@ async fn test_sync_create() {
 
     // Verify state was persisted
     let state_after = SyncState::load(&state_path).expect("reload state");
-    assert_eq!(state_after.pages.len(), 1, "state should contain 1 page entry");
+    assert_eq!(
+        state_after.pages.len(),
+        1,
+        "state should contain 1 page entry"
+    );
 
     let (_, page_state) = state_after.pages.iter().next().unwrap();
     assert_eq!(page_state.status, PageStatus::Published);
@@ -544,10 +538,7 @@ async fn test_sync_create() {
         .get_page(&page_state.telegraph_path, true)
         .await
         .expect("page should exist on Telegraph");
-    assert!(
-        !page.title.is_empty(),
-        "page title should be non-empty"
-    );
+    assert!(!page.title.is_empty(), "page title should be non-empty");
 
     rate_limit().await;
 }
@@ -724,8 +715,7 @@ async fn test_sync_delete() {
     rate_limit().await;
 
     // Remove the file
-    std::fs::remove_file(root.join("posts/to-delete.md"))
-        .expect("failed to remove markdown file");
+    std::fs::remove_file(root.join("posts/to-delete.md")).expect("failed to remove markdown file");
 
     // Second sync -- should delete
     let mut state2 = SyncState::load(&state_path).expect("reload state");
@@ -747,7 +737,11 @@ async fn test_sync_delete() {
     // Verify state shows deleted
     let state_after = SyncState::load(&state_path).expect("reload state");
     let (_, ps) = state_after.pages.iter().next().unwrap();
-    assert_eq!(ps.status, PageStatus::Deleted, "page should be marked deleted in state");
+    assert_eq!(
+        ps.status,
+        PageStatus::Deleted,
+        "page should be marked deleted in state"
+    );
 
     // Verify Telegraph page shows tombstone
     let client = TelegraphClient::new(TEST_TOKEN.to_string());
@@ -784,9 +778,18 @@ async fn test_sync_recreate_after_delete() {
     let mut state = SyncState::load(&state_path).expect("state load failed");
 
     // Create
-    run_sync(&config, &mut state, &state_path, root, None, false, None, true)
-        .await
-        .expect("first sync");
+    run_sync(
+        &config,
+        &mut state,
+        &state_path,
+        root,
+        None,
+        false,
+        None,
+        true,
+    )
+    .await
+    .expect("first sync");
 
     rate_limit().await;
 
@@ -802,9 +805,18 @@ async fn test_sync_recreate_after_delete() {
     // Delete
     std::fs::remove_file(root.join("posts/recreate.md")).unwrap();
     let mut state2 = SyncState::load(&state_path).expect("reload");
-    run_sync(&config, &mut state2, &state_path, root, None, false, None, true)
-        .await
-        .expect("delete sync");
+    run_sync(
+        &config,
+        &mut state2,
+        &state_path,
+        root,
+        None,
+        false,
+        None,
+        true,
+    )
+    .await
+    .expect("delete sync");
 
     rate_limit().await;
 
@@ -816,9 +828,18 @@ async fn test_sync_recreate_after_delete() {
         &format!("---\ntitle: {}\n---\nSecond version.\n", title2),
     );
     let mut state3 = SyncState::load(&state_path).expect("reload");
-    let summary3 = run_sync(&config, &mut state3, &state_path, root, None, false, None, true)
-        .await
-        .expect("recreate sync");
+    let summary3 = run_sync(
+        &config,
+        &mut state3,
+        &state_path,
+        root,
+        None,
+        false,
+        None,
+        true,
+    )
+    .await
+    .expect("recreate sync");
 
     assert_eq!(summary3.created, 1, "recreated file should be a new create");
 
@@ -858,9 +879,18 @@ async fn test_sync_multiple_files() {
     let state_path = root.join("state.json");
     let mut state = SyncState::load(&state_path).expect("state load failed");
 
-    let summary = run_sync(&config, &mut state, &state_path, root, None, false, None, true)
-        .await
-        .expect("sync should succeed");
+    let summary = run_sync(
+        &config,
+        &mut state,
+        &state_path,
+        root,
+        None,
+        false,
+        None,
+        true,
+    )
+    .await
+    .expect("sync should succeed");
 
     assert_eq!(summary.created, 3, "should create 3 pages");
     assert_eq!(summary.failed, 0, "should have 0 failures");
@@ -934,9 +964,18 @@ async fn test_sync_force_update() {
     let mut state = SyncState::load(&state_path).expect("state load failed");
 
     // First sync
-    run_sync(&config, &mut state, &state_path, root, None, false, None, true)
-        .await
-        .expect("first sync");
+    run_sync(
+        &config,
+        &mut state,
+        &state_path,
+        root,
+        None,
+        false,
+        None,
+        true,
+    )
+    .await
+    .expect("first sync");
 
     rate_limit().await;
 
@@ -1024,9 +1063,18 @@ async fn test_sync_content_safety_blocks() {
     let state_path = root.join("state.json");
     let mut state = SyncState::load(&state_path).expect("state load failed");
 
-    let summary = run_sync(&config, &mut state, &state_path, root, None, false, None, true)
-        .await
-        .expect("sync should succeed but skip unsafe file");
+    let summary = run_sync(
+        &config,
+        &mut state,
+        &state_path,
+        root,
+        None,
+        false,
+        None,
+        true,
+    )
+    .await
+    .expect("sync should succeed but skip unsafe file");
 
     assert_eq!(summary.skipped, 1, "unsafe file should be skipped");
     assert_eq!(summary.created, 0, "no pages should be created");
@@ -1058,9 +1106,18 @@ async fn test_sync_validation_rejects_table() {
     let state_path = root.join("state.json");
     let mut state = SyncState::load(&state_path).expect("state load failed");
 
-    let summary = run_sync(&config, &mut state, &state_path, root, None, false, None, true)
-        .await
-        .expect("sync should succeed");
+    let summary = run_sync(
+        &config,
+        &mut state,
+        &state_path,
+        root,
+        None,
+        false,
+        None,
+        true,
+    )
+    .await
+    .expect("sync should succeed");
 
     // Table syntax without ENABLE_TABLES is treated as plain text, so it creates successfully
     assert_eq!(
@@ -1089,9 +1146,18 @@ async fn test_sync_validation_rejects_image() {
     let state_path = root.join("state.json");
     let mut state = SyncState::load(&state_path).expect("state load failed");
 
-    let summary = run_sync(&config, &mut state, &state_path, root, None, false, None, true)
-        .await
-        .expect("sync should succeed but fail the file");
+    let summary = run_sync(
+        &config,
+        &mut state,
+        &state_path,
+        root,
+        None,
+        false,
+        None,
+        true,
+    )
+    .await
+    .expect("sync should succeed but fail the file");
 
     assert_eq!(summary.failed, 1, "file with image should fail validation");
     assert_eq!(summary.created, 0, "no pages should be created");
@@ -1120,9 +1186,18 @@ async fn test_sync_frontmatter_author_override() {
     let state_path = root.join("state.json");
     let mut state = SyncState::load(&state_path).expect("state load failed");
 
-    run_sync(&config, &mut state, &state_path, root, None, false, None, true)
-        .await
-        .expect("sync should succeed");
+    run_sync(
+        &config,
+        &mut state,
+        &state_path,
+        root,
+        None,
+        false,
+        None,
+        true,
+    )
+    .await
+    .expect("sync should succeed");
 
     // Verify the page uses custom author
     let state_after = SyncState::load(&state_path).expect("reload");
@@ -1160,9 +1235,18 @@ async fn test_sync_title_from_frontmatter() {
     let state_path = root.join("state.json");
     let mut state = SyncState::load(&state_path).expect("state load failed");
 
-    run_sync(&config, &mut state, &state_path, root, None, false, None, true)
-        .await
-        .expect("sync should succeed");
+    run_sync(
+        &config,
+        &mut state,
+        &state_path,
+        root,
+        None,
+        false,
+        None,
+        true,
+    )
+    .await
+    .expect("sync should succeed");
 
     let state_after = SyncState::load(&state_path).expect("reload");
     let (_, ps) = state_after.pages.iter().next().unwrap();
@@ -1197,9 +1281,18 @@ async fn test_sync_title_from_heading() {
     let state_path = root.join("state.json");
     let mut state = SyncState::load(&state_path).expect("state load failed");
 
-    run_sync(&config, &mut state, &state_path, root, None, false, None, true)
-        .await
-        .expect("sync should succeed");
+    run_sync(
+        &config,
+        &mut state,
+        &state_path,
+        root,
+        None,
+        false,
+        None,
+        true,
+    )
+    .await
+    .expect("sync should succeed");
 
     let state_after = SyncState::load(&state_path).expect("reload");
     let (_, ps) = state_after.pages.iter().next().unwrap();
@@ -1234,9 +1327,18 @@ async fn test_sync_title_from_filename() {
     let state_path = root.join("state.json");
     let mut state = SyncState::load(&state_path).expect("state load failed");
 
-    run_sync(&config, &mut state, &state_path, root, None, false, None, true)
-        .await
-        .expect("sync should succeed");
+    run_sync(
+        &config,
+        &mut state,
+        &state_path,
+        root,
+        None,
+        false,
+        None,
+        true,
+    )
+    .await
+    .expect("sync should succeed");
 
     let state_after = SyncState::load(&state_path).expect("reload");
     let (_, ps) = state_after.pages.iter().next().unwrap();
@@ -1273,9 +1375,18 @@ async fn test_sync_content_hash_ignores_frontmatter_whitespace() {
     let mut state = SyncState::load(&state_path).expect("state load failed");
 
     // First sync
-    run_sync(&config, &mut state, &state_path, root, None, false, None, true)
-        .await
-        .expect("first sync");
+    run_sync(
+        &config,
+        &mut state,
+        &state_path,
+        root,
+        None,
+        false,
+        None,
+        true,
+    )
+    .await
+    .expect("first sync");
 
     rate_limit().await;
 
@@ -1288,9 +1399,18 @@ async fn test_sync_content_hash_ignores_frontmatter_whitespace() {
 
     // Second sync -- should be up-to-date since the body, title, and author resolve identically
     let mut state2 = SyncState::load(&state_path).expect("reload");
-    let summary2 = run_sync(&config, &mut state2, &state_path, root, None, false, None, true)
-        .await
-        .expect("second sync");
+    let summary2 = run_sync(
+        &config,
+        &mut state2,
+        &state_path,
+        root,
+        None,
+        false,
+        None,
+        true,
+    )
+    .await
+    .expect("second sync");
 
     assert_eq!(
         summary2.up_to_date, 1,
@@ -1326,11 +1446,23 @@ async fn test_sync_multiple_publications() {
     let state_path = root.join("state.json");
     let mut state = SyncState::load(&state_path).expect("state load failed");
 
-    let summary = run_sync(&config, &mut state, &state_path, root, None, false, None, true)
-        .await
-        .expect("sync should succeed");
+    let summary = run_sync(
+        &config,
+        &mut state,
+        &state_path,
+        root,
+        None,
+        false,
+        None,
+        true,
+    )
+    .await
+    .expect("sync should succeed");
 
-    assert_eq!(summary.created, 2, "should create 2 pages (one per publication)");
+    assert_eq!(
+        summary.created, 2,
+        "should create 2 pages (one per publication)"
+    );
 
     let state_after = SyncState::load(&state_path).expect("reload");
     assert_eq!(state_after.pages.len(), 2);
