@@ -421,6 +421,7 @@ pub async fn execute_plan(
     summary
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn execute_create(
     file: &str,
     title: &str,
@@ -502,6 +503,7 @@ async fn execute_create(
     Err(last_error.unwrap_or_else(|| TelesyncError::Api("create failed with no error".to_string())))
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn execute_update(
     file: &str,
     path: &str,
@@ -689,6 +691,7 @@ async fn detect_duplicate_page(
 
 // --- Top-level orchestration ---
 
+#[allow(clippy::too_many_arguments)]
 pub async fn run_sync(
     config: &Config,
     state: &mut SyncState,
