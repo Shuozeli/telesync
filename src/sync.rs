@@ -130,10 +130,11 @@ fn collect_markdown_files_recursive(dir: &Path, root_dir: &Path, results: &mut V
             collect_markdown_files_recursive(&path, root_dir, results);
         } else if file_type.is_file()
             && let Some(ext) = path.extension()
-                && ext == "md"
-                    && let Ok(relative) = path.strip_prefix(root_dir) {
-                        results.push(relative.to_path_buf());
-                    }
+            && ext == "md"
+            && let Ok(relative) = path.strip_prefix(root_dir)
+        {
+            results.push(relative.to_path_buf());
+        }
     }
 }
 
