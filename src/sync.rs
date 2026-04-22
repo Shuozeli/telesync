@@ -292,15 +292,38 @@ const MAX_CONTENT_SIZE_BYTES: usize = 60 * 1024; // 60KB safety margin under 64K
 const RATE_LIMIT_DELAY_MS: u64 = 200;
 const MAX_RETRIES: usize = 3;
 
+/// Bundled context for page creation/update operations.
+struct PageCtx<'a> {
+    client: &'a TelegraphClient,
+    state: &'a mut SyncState,
+    state_path: &'a Path,
+    publication: &'a str,
+    /// Hash for update operations (set before calling execute_update).
+    new_hash: Option<&'a str>,
+}
+
+/// Bundled options for the top-level sync run.
+pub struct SyncOptions<'a> {
+    pub publication_filter: Option<&'a str>,
+    pub dry_run: bool,
+    pub force_file: Option<&'a str>,
+    pub confirm: bool,
+}
+
 pub async fn execute_plan(
     plan: &SyncPlan,
     client: &TelegraphClient,
-    account: &AccountConfig,
     state: &mut SyncState,
     state_path: &Path,
 ) -> SyncSummary {
-    let _ = account; // account info already embedded in planned actions
     let mut summary = SyncSummary::empty();
+    let mut ctx = PageCtx {
+        client,
+        state,
+        state_path,
+        publication: &plan.publication,
+        new_hash: None,
+    };
 
     for action in &plan.actions {
         match action {
@@ -311,18 +334,8 @@ pub async fn execute_plan(
                 author_name,
                 author_url,
             } => {
-                let result = execute_create(
-                    file,
-                    title,
-                    nodes,
-                    author_name,
-                    author_url,
-                    &plan.publication,
-                    client,
-                    state,
-                    state_path,
-                )
-                .await;
+                let result =
+                    execute_create(file, title, nodes, author_name, author_url, &mut ctx).await;
 
                 match result {
                     Ok(()) => {
@@ -349,19 +362,10 @@ pub async fn execute_plan(
                 author_url,
                 new_hash,
             } => {
-                let result = execute_update(
-                    file,
-                    path,
-                    title,
-                    nodes,
-                    author_name,
-                    author_url,
-                    new_hash,
-                    client,
-                    state,
-                    state_path,
-                )
-                .await;
+                ctx.new_hash = Some(new_hash);
+                let result =
+                    execute_update(file, path, title, nodes, author_name, author_url, &mut ctx)
+                        .await;
 
                 match result {
                     Ok(()) => {
@@ -380,8 +384,7 @@ pub async fn execute_plan(
             }
 
             PlannedAction::Delete { file, path } => {
-                let result =
-                    execute_delete(file, path, &plan.publication, client, state, state_path).await;
+                let result = execute_delete(file, path, &mut ctx).await;
 
                 match result {
                     Ok(()) => {
@@ -421,17 +424,13 @@ pub async fn execute_plan(
     summary
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn execute_create(
     file: &str,
     title: &str,
     nodes: &[Node],
     author_name: &str,
     author_url: &str,
-    publication: &str,
-    client: &TelegraphClient,
-    state: &mut SyncState,
-    state_path: &Path,
+    ctx: &mut PageCtx<'_>,
 ) -> Result<(), TelesyncError> {
     validate_content_size(file, nodes)?;
 
@@ -449,13 +448,13 @@ async fn execute_create(
             tokio::time::sleep(backoff).await;
 
             // Duplicate detection: check if page was already created
-            if let Some(page) = detect_duplicate_page(client, title).await {
+            if let Some(page) = detect_duplicate_page(ctx.client, title).await {
                 let hash = content_hash(nodes, title, author_name);
                 let now = Utc::now().to_rfc3339();
-                state.pages.insert(
+                ctx.state.pages.insert(
                     file.to_string(),
                     PageState {
-                        publication: publication.to_string(),
+                        publication: ctx.publication.to_string(),
                         telegraph_path: page.path.clone(),
                         telegraph_url: page.url.clone(),
                         content_hash: hash,
@@ -465,23 +464,24 @@ async fn execute_create(
                         deleted_at: None,
                     },
                 );
-                state.save(state_path)?;
+                ctx.state.save(ctx.state_path)?;
                 info!(file = %file, path = %page.path, "duplicate detected, recorded existing page");
                 return Ok(());
             }
         }
 
-        match client
+        match ctx
+            .client
             .create_page(title, Some(author_name), Some(author_url), nodes, false)
             .await
         {
             Ok(page) => {
                 let hash = content_hash(nodes, title, author_name);
                 let now = Utc::now().to_rfc3339();
-                state.pages.insert(
+                ctx.state.pages.insert(
                     file.to_string(),
                     PageState {
-                        publication: publication.to_string(),
+                        publication: ctx.publication.to_string(),
                         telegraph_path: page.path.clone(),
                         telegraph_url: page.url.clone(),
                         content_hash: hash,
@@ -491,7 +491,7 @@ async fn execute_create(
                         deleted_at: None,
                     },
                 );
-                state.save(state_path)?;
+                ctx.state.save(ctx.state_path)?;
                 return Ok(());
             }
             Err(e) => {
@@ -503,7 +503,6 @@ async fn execute_create(
     Err(last_error.unwrap_or_else(|| TelesyncError::Api("create failed with no error".to_string())))
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn execute_update(
     file: &str,
     path: &str,
@@ -511,10 +510,7 @@ async fn execute_update(
     nodes: &[Node],
     author_name: &str,
     author_url: &str,
-    new_hash: &str,
-    client: &TelegraphClient,
-    state: &mut SyncState,
-    state_path: &Path,
+    ctx: &mut PageCtx<'_>,
 ) -> Result<(), TelesyncError> {
     validate_content_size(file, nodes)?;
 
@@ -532,7 +528,8 @@ async fn execute_update(
             tokio::time::sleep(backoff).await;
         }
 
-        match client
+        match ctx
+            .client
             .edit_page(
                 path,
                 title,
@@ -545,20 +542,21 @@ async fn execute_update(
         {
             Ok(page) => {
                 let now = Utc::now().to_rfc3339();
-                if let Some(page_state) = state.pages.get_mut(file) {
-                    page_state.content_hash = new_hash.to_string();
+                let new_hash = ctx.new_hash.map(|s| s.to_string()).unwrap_or_default();
+                if let Some(page_state) = ctx.state.pages.get_mut(file) {
+                    page_state.content_hash = new_hash.clone();
                     page_state.title = title.to_string();
                     page_state.last_synced = now;
                     page_state.telegraph_url = page.url;
                 } else {
                     // State entry was missing; re-create it
-                    state.pages.insert(
+                    ctx.state.pages.insert(
                         file.to_string(),
                         PageState {
                             publication: String::new(),
                             telegraph_path: path.to_string(),
                             telegraph_url: page.url,
-                            content_hash: new_hash.to_string(),
+                            content_hash: new_hash.clone(),
                             title: title.to_string(),
                             last_synced: now,
                             status: PageStatus::Published,
@@ -566,7 +564,7 @@ async fn execute_update(
                         },
                     );
                 }
-                state.save(state_path)?;
+                ctx.state.save(ctx.state_path)?;
                 return Ok(());
             }
             Err(e) => {
@@ -581,10 +579,7 @@ async fn execute_update(
 async fn execute_delete(
     file: &str,
     path: &str,
-    publication: &str,
-    client: &TelegraphClient,
-    state: &mut SyncState,
-    state_path: &Path,
+    ctx: &mut PageCtx<'_>,
 ) -> Result<(), TelesyncError> {
     let today = Utc::now().format("%Y-%m-%d").to_string();
     let tombstone_content = build_tombstone_nodes(&today);
@@ -604,27 +599,29 @@ async fn execute_delete(
         }
 
         // Retrieve the current title from state for the edit call
-        let title = state
+        let title = ctx
+            .state
             .pages
             .get(file)
             .map(|ps| ps.title.clone())
             .unwrap_or_else(|| "Removed".to_string());
 
-        match client
+        match ctx
+            .client
             .edit_page(path, &title, None, None, &tombstone_content, false)
             .await
         {
             Ok(_) => {
                 let now = Utc::now().to_rfc3339();
-                if let Some(page_state) = state.pages.get_mut(file) {
+                if let Some(page_state) = ctx.state.pages.get_mut(file) {
                     page_state.status = PageStatus::Deleted;
                     page_state.deleted_at = Some(now.clone());
                     page_state.last_synced = now;
                 } else {
-                    state.pages.insert(
+                    ctx.state.pages.insert(
                         file.to_string(),
                         PageState {
-                            publication: publication.to_string(),
+                            publication: ctx.publication.to_string(),
                             telegraph_path: path.to_string(),
                             telegraph_url: format!("https://telegra.ph/{}", path),
                             content_hash: String::new(),
@@ -635,7 +632,7 @@ async fn execute_delete(
                         },
                     );
                 }
-                state.save(state_path)?;
+                ctx.state.save(ctx.state_path)?;
                 return Ok(());
             }
             Err(e) => {
@@ -691,18 +688,14 @@ async fn detect_duplicate_page(
 
 // --- Top-level orchestration ---
 
-#[allow(clippy::too_many_arguments)]
 pub async fn run_sync(
     config: &Config,
     state: &mut SyncState,
     state_path: &Path,
     root_dir: &Path,
-    publication_filter: Option<&str>,
-    dry_run: bool,
-    force_file: Option<&str>,
-    confirm: bool,
+    options: &SyncOptions<'_>,
 ) -> Result<SyncSummary, TelesyncError> {
-    let publications: Vec<&Publication> = match publication_filter {
+    let publications: Vec<&Publication> = match options.publication_filter {
         Some(name) => {
             let matched: Vec<&Publication> = config
                 .publications
@@ -736,16 +729,16 @@ pub async fn run_sync(
             .values()
             .any(|ps| ps.publication == publication.name);
 
-        if !has_existing_state && !confirm {
+        if !has_existing_state && !options.confirm {
             return Err(TelesyncError::ConfirmationRequired(format!(
                 "first sync for publication '{}' -- pass --confirm to proceed",
                 publication.name
             )));
         }
 
-        let plan = plan_sync(publication, account, state, root_dir, force_file);
+        let plan = plan_sync(publication, account, state, root_dir, options.force_file);
 
-        if dry_run {
+        if options.dry_run {
             print_plan(&plan);
             let plan_summary = summarize_plan(&plan);
             aggregate.merge(plan_summary);
@@ -753,7 +746,7 @@ pub async fn run_sync(
         }
 
         let client = TelegraphClient::new(account.access_token.clone());
-        let summary = execute_plan(&plan, &client, account, state, state_path).await;
+        let summary = execute_plan(&plan, &client, state, state_path).await;
         aggregate.merge(summary);
     }
 

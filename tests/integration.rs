@@ -5,7 +5,7 @@ use telesync::client::TelegraphClient;
 use telesync::config::Config;
 use telesync::error::TelesyncError;
 use telesync::state::{PageStatus, SyncState};
-use telesync::sync::run_sync;
+use telesync::sync::{SyncOptions, run_sync};
 use telesync::types::{Node, NodeAttrs, NodeElement};
 
 const TEST_TOKEN: &str = "b3a57cb6d7732ae7bedc0ae33cf60fd303bee3bfdd7b77446e76bbc604b4";
@@ -509,10 +509,12 @@ async fn test_sync_create() {
         &mut state,
         &state_path,
         root,
-        None,
-        false,
-        None,
-        true,
+        &SyncOptions {
+            publication_filter: None,
+            dry_run: false,
+            force_file: None,
+            confirm: true,
+        },
     )
     .await
     .expect("run_sync should succeed");
@@ -567,10 +569,12 @@ async fn test_sync_idempotent() {
         &mut state,
         &state_path,
         root,
-        None,
-        false,
-        None,
-        true,
+        &SyncOptions {
+            publication_filter: None,
+            dry_run: false,
+            force_file: None,
+            confirm: true,
+        },
     )
     .await
     .expect("first sync should succeed");
@@ -585,10 +589,12 @@ async fn test_sync_idempotent() {
         &mut state2,
         &state_path,
         root,
-        None,
-        false,
-        None,
-        true,
+        &SyncOptions {
+            publication_filter: None,
+            dry_run: false,
+            force_file: None,
+            confirm: true,
+        },
     )
     .await
     .expect("second sync should succeed");
@@ -627,10 +633,12 @@ async fn test_sync_update() {
         &mut state,
         &state_path,
         root,
-        None,
-        false,
-        None,
-        true,
+        &SyncOptions {
+            publication_filter: None,
+            dry_run: false,
+            force_file: None,
+            confirm: true,
+        },
     )
     .await
     .expect("first sync should succeed");
@@ -651,10 +659,12 @@ async fn test_sync_update() {
         &mut state2,
         &state_path,
         root,
-        None,
-        false,
-        None,
-        true,
+        &SyncOptions {
+            publication_filter: None,
+            dry_run: false,
+            force_file: None,
+            confirm: true,
+        },
     )
     .await
     .expect("second sync should succeed");
@@ -704,10 +714,12 @@ async fn test_sync_delete() {
         &mut state,
         &state_path,
         root,
-        None,
-        false,
-        None,
-        true,
+        &SyncOptions {
+            publication_filter: None,
+            dry_run: false,
+            force_file: None,
+            confirm: true,
+        },
     )
     .await
     .expect("first sync should succeed");
@@ -724,10 +736,12 @@ async fn test_sync_delete() {
         &mut state2,
         &state_path,
         root,
-        None,
-        false,
-        None,
-        true,
+        &SyncOptions {
+            publication_filter: None,
+            dry_run: false,
+            force_file: None,
+            confirm: true,
+        },
     )
     .await
     .expect("second sync should succeed");
@@ -783,10 +797,12 @@ async fn test_sync_recreate_after_delete() {
         &mut state,
         &state_path,
         root,
-        None,
-        false,
-        None,
-        true,
+        &SyncOptions {
+            publication_filter: None,
+            dry_run: false,
+            force_file: None,
+            confirm: true,
+        },
     )
     .await
     .expect("first sync");
@@ -810,10 +826,12 @@ async fn test_sync_recreate_after_delete() {
         &mut state2,
         &state_path,
         root,
-        None,
-        false,
-        None,
-        true,
+        &SyncOptions {
+            publication_filter: None,
+            dry_run: false,
+            force_file: None,
+            confirm: true,
+        },
     )
     .await
     .expect("delete sync");
@@ -833,10 +851,12 @@ async fn test_sync_recreate_after_delete() {
         &mut state3,
         &state_path,
         root,
-        None,
-        false,
-        None,
-        true,
+        &SyncOptions {
+            publication_filter: None,
+            dry_run: false,
+            force_file: None,
+            confirm: true,
+        },
     )
     .await
     .expect("recreate sync");
@@ -884,10 +904,12 @@ async fn test_sync_multiple_files() {
         &mut state,
         &state_path,
         root,
-        None,
-        false,
-        None,
-        true,
+        &SyncOptions {
+            publication_filter: None,
+            dry_run: false,
+            force_file: None,
+            confirm: true,
+        },
     )
     .await
     .expect("sync should succeed");
@@ -924,10 +946,12 @@ async fn test_sync_dry_run() {
         &mut state,
         &state_path,
         root,
-        None,
-        true, // dry_run = true
-        None,
-        true,
+        &SyncOptions {
+            publication_filter: None,
+            dry_run: true,
+            force_file: None,
+            confirm: true,
+        },
     )
     .await
     .expect("dry run sync should succeed");
@@ -969,10 +993,12 @@ async fn test_sync_force_update() {
         &mut state,
         &state_path,
         root,
-        None,
-        false,
-        None,
-        true,
+        &SyncOptions {
+            publication_filter: None,
+            dry_run: false,
+            force_file: None,
+            confirm: true,
+        },
     )
     .await
     .expect("first sync");
@@ -986,10 +1012,12 @@ async fn test_sync_force_update() {
         &mut state2,
         &state_path,
         root,
-        None,
-        false,
-        Some("posts/forced.md"),
-        true,
+        &SyncOptions {
+            publication_filter: None,
+            dry_run: false,
+            force_file: Some("posts/forced.md"),
+            confirm: true,
+        },
     )
     .await
     .expect("force sync");
@@ -1020,10 +1048,12 @@ async fn test_sync_first_sync_requires_confirm() {
         &mut state,
         &state_path,
         root,
-        None,
-        false,
-        None,
-        false, // confirm = false
+        &SyncOptions {
+            publication_filter: None,
+            dry_run: false,
+            force_file: None,
+            confirm: false,
+        },
     )
     .await;
 
@@ -1068,10 +1098,12 @@ async fn test_sync_content_safety_blocks() {
         &mut state,
         &state_path,
         root,
-        None,
-        false,
-        None,
-        true,
+        &SyncOptions {
+            publication_filter: None,
+            dry_run: false,
+            force_file: None,
+            confirm: true,
+        },
     )
     .await
     .expect("sync should succeed but skip unsafe file");
@@ -1111,10 +1143,12 @@ async fn test_sync_validation_rejects_table() {
         &mut state,
         &state_path,
         root,
-        None,
-        false,
-        None,
-        true,
+        &SyncOptions {
+            publication_filter: None,
+            dry_run: false,
+            force_file: None,
+            confirm: true,
+        },
     )
     .await
     .expect("sync should succeed");
@@ -1151,10 +1185,12 @@ async fn test_sync_validation_rejects_image() {
         &mut state,
         &state_path,
         root,
-        None,
-        false,
-        None,
-        true,
+        &SyncOptions {
+            publication_filter: None,
+            dry_run: false,
+            force_file: None,
+            confirm: true,
+        },
     )
     .await
     .expect("sync should succeed but fail the file");
@@ -1191,10 +1227,12 @@ async fn test_sync_frontmatter_author_override() {
         &mut state,
         &state_path,
         root,
-        None,
-        false,
-        None,
-        true,
+        &SyncOptions {
+            publication_filter: None,
+            dry_run: false,
+            force_file: None,
+            confirm: true,
+        },
     )
     .await
     .expect("sync should succeed");
@@ -1240,10 +1278,12 @@ async fn test_sync_title_from_frontmatter() {
         &mut state,
         &state_path,
         root,
-        None,
-        false,
-        None,
-        true,
+        &SyncOptions {
+            publication_filter: None,
+            dry_run: false,
+            force_file: None,
+            confirm: true,
+        },
     )
     .await
     .expect("sync should succeed");
@@ -1286,10 +1326,12 @@ async fn test_sync_title_from_heading() {
         &mut state,
         &state_path,
         root,
-        None,
-        false,
-        None,
-        true,
+        &SyncOptions {
+            publication_filter: None,
+            dry_run: false,
+            force_file: None,
+            confirm: true,
+        },
     )
     .await
     .expect("sync should succeed");
@@ -1332,10 +1374,12 @@ async fn test_sync_title_from_filename() {
         &mut state,
         &state_path,
         root,
-        None,
-        false,
-        None,
-        true,
+        &SyncOptions {
+            publication_filter: None,
+            dry_run: false,
+            force_file: None,
+            confirm: true,
+        },
     )
     .await
     .expect("sync should succeed");
@@ -1380,10 +1424,12 @@ async fn test_sync_content_hash_ignores_frontmatter_whitespace() {
         &mut state,
         &state_path,
         root,
-        None,
-        false,
-        None,
-        true,
+        &SyncOptions {
+            publication_filter: None,
+            dry_run: false,
+            force_file: None,
+            confirm: true,
+        },
     )
     .await
     .expect("first sync");
@@ -1404,10 +1450,12 @@ async fn test_sync_content_hash_ignores_frontmatter_whitespace() {
         &mut state2,
         &state_path,
         root,
-        None,
-        false,
-        None,
-        true,
+        &SyncOptions {
+            publication_filter: None,
+            dry_run: false,
+            force_file: None,
+            confirm: true,
+        },
     )
     .await
     .expect("second sync");
@@ -1451,10 +1499,12 @@ async fn test_sync_multiple_publications() {
         &mut state,
         &state_path,
         root,
-        None,
-        false,
-        None,
-        true,
+        &SyncOptions {
+            publication_filter: None,
+            dry_run: false,
+            force_file: None,
+            confirm: true,
+        },
     )
     .await
     .expect("sync should succeed");
@@ -1516,10 +1566,12 @@ async fn test_sync_publication_filter() {
         &mut state,
         &state_path,
         root,
-        Some("blog"),
-        false,
-        None,
-        true,
+        &SyncOptions {
+            publication_filter: Some("blog"),
+            dry_run: false,
+            force_file: None,
+            confirm: true,
+        },
     )
     .await
     .expect("filtered sync should succeed");

@@ -124,17 +124,13 @@ async fn run_sync_command(
     let config = Config::load(&config_path)?;
     let mut state = SyncState::load(&state_path)?;
 
-    let summary = run_sync(
-        &config,
-        &mut state,
-        &state_path,
-        &root_dir,
+    let options = telesync::sync::SyncOptions {
         publication_filter,
         dry_run,
         force_file,
         confirm,
-    )
-    .await?;
+    };
+    let summary = run_sync(&config, &mut state, &state_path, &root_dir, &options).await?;
 
     print_summary(&summary);
 
