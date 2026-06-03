@@ -292,37 +292,20 @@ const MAX_CONTENT_SIZE_BYTES: usize = 60 * 1024; // 60KB safety margin under 64K
 const RATE_LIMIT_DELAY_MS: u64 = 200;
 const MAX_RETRIES: usize = 3;
 
-/// Bundled context for page creation/update operations.
-struct PageCtx<'a> {
-    client: &'a TelegraphClient,
-    state: &'a mut SyncState,
-    state_path: &'a Path,
-    publication: &'a str,
-    /// Hash for update operations (set before calling execute_update).
-    new_hash: Option<&'a str>,
-}
-
-/// Bundled options for the top-level sync run.
-pub struct SyncOptions<'a> {
-    pub publication_filter: Option<&'a str>,
-    pub dry_run: bool,
-    pub force_file: Option<&'a str>,
-    pub confirm: bool,
-}
-
 pub async fn execute_plan(
     plan: &SyncPlan,
     client: &TelegraphClient,
+    account: &AccountConfig,
     state: &mut SyncState,
     state_path: &Path,
 ) -> SyncSummary {
+    let _ = account; // account info already embedded in planned actions
     let mut summary = SyncSummary::empty();
-    let mut ctx = PageCtx {
+    let mut ctx = ExecutionCtx {
+        publication: &plan.publication,
         client,
         state,
         state_path,
-        publication: &plan.publication,
-        new_hash: None,
     };
 
     for action in &plan.actions {
@@ -334,8 +317,17 @@ pub async fn execute_plan(
                 author_name,
                 author_url,
             } => {
-                let result =
-                    execute_create(file, title, nodes, author_name, author_url, &mut ctx).await;
+                let result = execute_create(
+                    CreateRequest {
+                        file,
+                        title,
+                        nodes,
+                        author_name,
+                        author_url,
+                    },
+                    &mut ctx,
+                )
+                .await;
 
                 match result {
                     Ok(()) => {
@@ -362,10 +354,19 @@ pub async fn execute_plan(
                 author_url,
                 new_hash,
             } => {
-                ctx.new_hash = Some(new_hash);
-                let result =
-                    execute_update(file, path, title, nodes, author_name, author_url, &mut ctx)
-                        .await;
+                let result = execute_update(
+                    UpdateRequest {
+                        file,
+                        path,
+                        title,
+                        nodes,
+                        author_name,
+                        author_url,
+                        new_hash,
+                    },
+                    &mut ctx,
+                )
+                .await;
 
                 match result {
                     Ok(()) => {
@@ -424,14 +425,42 @@ pub async fn execute_plan(
     summary
 }
 
+struct ExecutionCtx<'a> {
+    publication: &'a str,
+    client: &'a TelegraphClient,
+    state: &'a mut SyncState,
+    state_path: &'a Path,
+}
+
+struct CreateRequest<'a> {
+    file: &'a str,
+    title: &'a str,
+    nodes: &'a [Node],
+    author_name: &'a str,
+    author_url: &'a str,
+}
+
+struct UpdateRequest<'a> {
+    file: &'a str,
+    path: &'a str,
+    title: &'a str,
+    nodes: &'a [Node],
+    author_name: &'a str,
+    author_url: &'a str,
+    new_hash: &'a str,
+}
+
 async fn execute_create(
-    file: &str,
-    title: &str,
-    nodes: &[Node],
-    author_name: &str,
-    author_url: &str,
-    ctx: &mut PageCtx<'_>,
+    request: CreateRequest<'_>,
+    ctx: &mut ExecutionCtx<'_>,
 ) -> Result<(), TelesyncError> {
+    let CreateRequest {
+        file,
+        title,
+        nodes,
+        author_name,
+        author_url,
+    } = request;
     validate_content_size(file, nodes)?;
 
     let mut last_error: Option<TelesyncError> = None;
@@ -504,14 +533,18 @@ async fn execute_create(
 }
 
 async fn execute_update(
-    file: &str,
-    path: &str,
-    title: &str,
-    nodes: &[Node],
-    author_name: &str,
-    author_url: &str,
-    ctx: &mut PageCtx<'_>,
+    request: UpdateRequest<'_>,
+    ctx: &mut ExecutionCtx<'_>,
 ) -> Result<(), TelesyncError> {
+    let UpdateRequest {
+        file,
+        path,
+        title,
+        nodes,
+        author_name,
+        author_url,
+        new_hash,
+    } = request;
     validate_content_size(file, nodes)?;
 
     let mut last_error: Option<TelesyncError> = None;
@@ -542,9 +575,8 @@ async fn execute_update(
         {
             Ok(page) => {
                 let now = Utc::now().to_rfc3339();
-                let new_hash = ctx.new_hash.map(|s| s.to_string()).unwrap_or_default();
                 if let Some(page_state) = ctx.state.pages.get_mut(file) {
-                    page_state.content_hash = new_hash.clone();
+                    page_state.content_hash = new_hash.to_string();
                     page_state.title = title.to_string();
                     page_state.last_synced = now;
                     page_state.telegraph_url = page.url;
@@ -556,7 +588,7 @@ async fn execute_update(
                             publication: String::new(),
                             telegraph_path: path.to_string(),
                             telegraph_url: page.url,
-                            content_hash: new_hash.clone(),
+                            content_hash: new_hash.to_string(),
                             title: title.to_string(),
                             last_synced: now,
                             status: PageStatus::Published,
@@ -579,7 +611,7 @@ async fn execute_update(
 async fn execute_delete(
     file: &str,
     path: &str,
-    ctx: &mut PageCtx<'_>,
+    ctx: &mut ExecutionCtx<'_>,
 ) -> Result<(), TelesyncError> {
     let today = Utc::now().format("%Y-%m-%d").to_string();
     let tombstone_content = build_tombstone_nodes(&today);
@@ -688,6 +720,14 @@ async fn detect_duplicate_page(
 
 // --- Top-level orchestration ---
 
+/// Bundled options for the top-level sync run.
+pub struct SyncOptions<'a> {
+    pub publication_filter: Option<&'a str>,
+    pub dry_run: bool,
+    pub force_file: Option<&'a str>,
+    pub confirm: bool,
+}
+
 pub async fn run_sync(
     config: &Config,
     state: &mut SyncState,
@@ -710,7 +750,7 @@ pub async fn run_sync(
             }
             matched
         }
-        None => config.publications.iter().collect(),
+        None => config.publications.iter().filter(|p| p.enabled).collect(),
     };
 
     let mut aggregate = SyncSummary::empty();
@@ -746,7 +786,7 @@ pub async fn run_sync(
         }
 
         let client = TelegraphClient::new(account.access_token.clone());
-        let summary = execute_plan(&plan, &client, state, state_path).await;
+        let summary = execute_plan(&plan, &client, account, state, state_path).await;
         aggregate.merge(summary);
     }
 

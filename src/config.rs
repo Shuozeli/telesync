@@ -16,6 +16,13 @@ pub struct Publication {
     pub name: String,
     pub path: String,
     pub account: String,
+    /// If false, this publication is skipped during sync. Defaults to true.
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Deserialize)]
